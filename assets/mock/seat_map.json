@@ -1,0 +1,66 @@
+{
+  "success": true,
+  "data": {
+    "trip": {
+      "id": 1,
+      "price_per_seat": 45000,
+      "currency": "SYP"
+    },
+    "bus": {
+      "bus_number": "HAM-2026",
+      "total_rows": 10,
+      "total_columns": 4
+    },
+    "seats": [
+      { "id": 1, "seat_number": "01", "row": 1, "column": 1, "type": "seat", "is_available": true },
+      { "id": 2, "seat_number": "02", "row": 1, "column": 2, "type": "seat", "is_available": true },
+      { "id": 3, "seat_number": null, "row": 1, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 4, "seat_number": "03", "row": 1, "column": 4, "type": "seat", "is_available": false },
+
+      { "id": 5, "seat_number": "04", "row": 2, "column": 1, "type": "seat", "is_available": true },
+      { "id": 6, "seat_number": "05", "row": 2, "column": 2, "type": "seat", "is_available": true },
+      { "id": 7, "seat_number": null, "row": 2, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 8, "seat_number": "06", "row": 2, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 9, "seat_number": "07", "row": 3, "column": 1, "type": "seat", "is_available": true },
+      { "id": 10, "seat_number": "08", "row": 3, "column": 2, "type": "seat", "is_available": true },
+      { "id": 11, "seat_number": null, "row": 3, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 12, "seat_number": "09", "row": 3, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 13, "seat_number": "10", "row": 4, "column": 1, "type": "seat", "is_available": true },
+      { "id": 14, "seat_number": "11", "row": 4, "column": 2, "type": "seat", "is_available": true },
+      { "id": 15, "seat_number": null, "row": 4, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 16, "seat_number": "12", "row": 4, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 17, "seat_number": "13", "row": 5, "column": 1, "type": "seat", "is_available": true },
+      { "id": 18, "seat_number": "14", "row": 5, "column": 2, "type": "seat", "is_available": true },
+      { "id": 19, "seat_number": null, "row": 5, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 20, "seat_number": "15", "row": 5, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 21, "seat_number": "16", "row": 6, "column": 1, "type": "seat", "is_available": true },
+      { "id": 22, "seat_number": "17", "row": 6, "column": 2, "type": "seat", "is_available": true },
+      { "id": 23, "seat_number": null, "row": 6, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 24, "seat_number": null, "row": 6, "column": 4, "type": "door", "is_available": false },
+
+      { "id": 25, "seat_number": "18", "row": 7, "column": 1, "type": "seat", "is_available": true },
+      { "id": 26, "seat_number": "19", "row": 7, "column": 2, "type": "seat", "is_available": true },
+      { "id": 27, "seat_number": null, "row": 7, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 28, "seat_number": "20", "row": 7, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 29, "seat_number": "21", "row": 8, "column": 1, "type": "seat", "is_available": true },
+      { "id": 30, "seat_number": "22", "row": 8, "column": 2, "type": "seat", "is_available": true },
+      { "id": 31, "seat_number": null, "row": 8, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 32, "seat_number": "23", "row": 8, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 33, "seat_number": "24", "row": 9, "column": 1, "type": "seat", "is_available": true },
+      { "id": 34, "seat_number": "25", "row": 9, "column": 2, "type": "seat", "is_available": true },
+      { "id": 35, "seat_number": null, "row": 9, "column": 3, "type": "aisle", "is_available": false },
+      { "id": 36, "seat_number": "26", "row": 9, "column": 4, "type": "seat", "is_available": true },
+
+      { "id": 37, "seat_number": "27", "row": 10, "column": 1, "type": "seat", "is_available": true },
+      { "id": 38, "seat_number": "28", "row": 10, "column": 2, "type": "seat", "is_available": true },
+      { "id": 39, "seat_number": "29", "row": 10, "column": 3, "type": "seat", "is_available": true },
+      { "id": 40, "seat_number": "30", "row": 10, "column": 4, "type": "seat", "is_available": true }
+    ]
+  }
+}
