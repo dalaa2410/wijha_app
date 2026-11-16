@@ -12,7 +12,9 @@ class ReservationModel extends Reservation {
     }
     return ReservationModel(
       bookingId: (id as num).toInt(),
-      expiresAt: DateTime.tryParse((data as Map)['expires_at']?.toString() ?? ''),
+      expiresAt: DateTime.tryParse(
+        (data as Map)['expires_at']?.toString() ?? '',
+      ),
     );
   }
 }

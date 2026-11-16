@@ -10,6 +10,11 @@ class SeatMap extends Equatable {
   final int totalColumns;
   final List<Seat> seats;
 
+  // تفاصيل الرحلة: اختيارية، فلا تكسر أي شاشة لا تستخدمها
+  final String? origin;
+  final String? destination;
+  final DateTime? departureTime;
+
   SeatMap({
     required this.tripId,
     required this.pricePerSeat,
@@ -18,9 +23,12 @@ class SeatMap extends Equatable {
     required this.totalRows,
     required this.totalColumns,
     required this.seats,
+    this.origin,
+    this.destination,
+    this.departureTime,
   });
 
-  // فهرس للبحث السريع: (صف، عمود) ← المقعد. يُبنى مرة واحدة فقط (late final)
+  // فهرس للبحث السريع: (صف، عمود) ← المقعد
   late final Map<(int, int), Seat> _byPosition = {
     for (final seat in seats) (seat.row, seat.column): seat,
   };
@@ -28,6 +36,16 @@ class SeatMap extends Equatable {
   Seat? seatAt(int row, int column) => _byPosition[(row, column)];
 
   @override
-  List<Object?> get props =>
-      [tripId, pricePerSeat, currency, busNumber, totalRows, totalColumns, seats];
+  List<Object?> get props => [
+    tripId,
+    pricePerSeat,
+    currency,
+    busNumber,
+    totalRows,
+    totalColumns,
+    seats,
+    origin,
+    destination,
+    departureTime,
+  ];
 }

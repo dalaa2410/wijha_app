@@ -8,6 +8,7 @@ import 'package:wijha_app/features/auth/presentation/cubit/request_state.dart';
 import 'package:wijha_app/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:wijha_app/features/auth/presentation/screens/register_screen.dart'; // <-- تم الاستيراد هنا
 import 'package:wijha_app/features/auth/presentation/screens/seat_map_screen.dart';
+import 'package:wijha_app/features/trips/presentation/screens/trips_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,12 +44,10 @@ class _LoginScreenState extends State<LoginScreen> {
       child: BlocConsumer<LoginCubit, RequestState>(
         listener: (context, state) {
           if (state.status == RequestStatus.success) {
-            // مؤقتًا إلى شاشة المقاعد، وحين تُبنى شاشة الرحلات نغيّرها إليها
+            // الانتقال إلى شاشة الرحلات كأول صفحة بعد تسجيل الدخول
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                builder: (_) => const SeatMapScreen(tripId: 1),
-              ),
+              MaterialPageRoute(builder: (_) => const TripsScreen()),
               (route) => false,
             );
           } else if (state.status == RequestStatus.failure) {
@@ -231,7 +230,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               border: _border(Colors.grey.shade200),
                               enabledBorder: _border(Colors.grey.shade200),
-                              focusedBorder: _border(AppColors.primaryBlue, 1.5),
+                              focusedBorder: _border(
+                                AppColors.primaryBlue,
+                                1.5,
+                              ),
                               errorBorder: _border(AppColors.error),
                               focusedErrorBorder: _border(AppColors.error, 1.5),
                             ),
@@ -296,7 +298,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               border: _border(Colors.grey.shade200),
                               enabledBorder: _border(Colors.grey.shade200),
-                              focusedBorder: _border(AppColors.primaryBlue, 1.5),
+                              focusedBorder: _border(
+                                AppColors.primaryBlue,
+                                1.5,
+                              ),
                               errorBorder: _border(AppColors.error),
                               focusedErrorBorder: _border(AppColors.error, 1.5),
                             ),
@@ -351,9 +356,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : () {
                                       if (_formKey.currentState!.validate()) {
                                         context.read<LoginCubit>().login(
-                                              _emailController.text.trim(),
-                                              _passwordController.text,
-                                            );
+                                          _emailController.text.trim(),
+                                          _passwordController.text,
+                                        );
                                       }
                                     },
                               child: isLoading

@@ -11,22 +11,34 @@ class SeatModel extends Seat {
   });
 
   factory SeatModel.fromJson(Map<String, dynamic> json) {
+    final row = (json['row'] as num).toInt();
+    final column = (json['column'] as num).toInt();
     final isAvailable = json['is_available'] as bool? ?? false;
+
     return SeatModel(
-      id: json['id'] as int,
-      number: json['seat_number'] as String?,
-      row: json['row'] as int,
-      column: json['column'] as int,
+      // الممر والباب يأتيان الآن بـ id = null، فنعطيهما رقمًا سالبًا فريدًا
+      id: (json['id'] as num?)?.toInt() ?? -(row * 100 + column),
+      number: json['seat_number']?.toString(),
+      row: row,
+      column: column,
       type: _parseType(json['type'] as String?),
-      status: isAvailable ? SeatStatus.available : SeatStatus.booked,
+      status: _parseStatus(json['status'] as String?, isAvailable),
     );
   }
 
   // أي نوع جديد يضيفه الباك لاحقًا يصبح unknown بدل أن ينهار التطبيق
   static SeatType _parseType(String? raw) => switch (raw) {
-        'seat' => SeatType.seat,
-        'aisle' => SeatType.aisle,
-        'door' => SeatType.door,
-        _ => SeatType.unknown,
-      };
+    'seat' => SeatType.seat,
+    'aisle' => SeatType.aisle,
+    'door' => SeatType.door,
+    _ => SeatType.unknown,
+  };
+
+  // إن أرسل الباك status نستخدمه، وإلا نعتمد is_available
+  static SeatStatus _parseStatus(String? raw, bool isAvailable) => switch (raw) {
+    'available' => SeatStatus.available,
+    'held' => SeatStatus.held,
+    'booked' => SeatStatus.booked,
+    _ => isAvailable ? SeatStatus.available : SeatStatus.booked,
+  };
 }

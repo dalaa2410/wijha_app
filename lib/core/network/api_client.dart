@@ -5,11 +5,16 @@ class ApiClient {
   final Dio _dio;
   ApiClient(this._dio);
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) =>
-      _send(() => _dio.get(path, queryParameters: query));
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, dynamic>? query,
+  }) => _send(() => _dio.get(path, queryParameters: query));
 
   Future<Map<String, dynamic>> post(String path, {Object? body}) =>
       _send(() => _dio.post(path, data: body));
+
+  Future<Map<String, dynamic>> delete(String path, {Object? body}) =>
+      _send(() => _dio.delete(path, data: body));
 
   Future<Map<String, dynamic>> _send(
     Future<Response<dynamic>> Function() request,
@@ -44,7 +49,10 @@ class ApiClient {
     if (status == 422) {
       final errors = _parseErrors(data);
       final first = errors.values.firstOrNull?.firstOrNull;
-      return ValidationException(first ?? message ?? 'بيانات غير صحيحة', errors);
+      return ValidationException(
+        first ?? message ?? 'بيانات غير صحيحة',
+        errors,
+      );
     }
     if (status != null && status >= 500) return ServerException(message);
     return UnknownException(message);

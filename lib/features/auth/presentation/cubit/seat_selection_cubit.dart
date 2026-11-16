@@ -16,6 +16,10 @@ class SeatSelectionState extends Equatable {
   final String? errorMessage; // سبب فشل التحميل
   final bool isSubmitting; // أثناء إرسال طلب الحجز
   final Reservation? reservation;
+  final bool hasPendingBooking;
+  final Reservation? pendingReservation;
+  final List<String> pendingSeatNumbers;
+  final int pendingTotalPrice;
 
   const SeatSelectionState({
     this.status = SeatMapStatus.loading,
@@ -25,6 +29,10 @@ class SeatSelectionState extends Equatable {
     this.errorMessage,
     this.isSubmitting = false,
     this.reservation,
+    this.hasPendingBooking = false,
+    this.pendingReservation,
+    this.pendingSeatNumbers = const [],
+    this.pendingTotalPrice = 0,
   });
 
   List<Seat> get selectedSeats {
@@ -45,6 +53,10 @@ class SeatSelectionState extends Equatable {
     Reservation? reservation,
     bool clearMessage = false,
     bool clearReservation = false,
+    bool? hasPendingBooking,
+    Reservation? pendingReservation,
+    List<String>? pendingSeatNumbers,
+    int? pendingTotalPrice,
   }) {
     return SeatSelectionState(
       status: status ?? this.status,
@@ -54,19 +66,27 @@ class SeatSelectionState extends Equatable {
       errorMessage: errorMessage ?? this.errorMessage,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       reservation: clearReservation ? null : (reservation ?? this.reservation),
+      hasPendingBooking: hasPendingBooking ?? this.hasPendingBooking,
+      pendingReservation: pendingReservation ?? this.pendingReservation,
+      pendingSeatNumbers: pendingSeatNumbers ?? this.pendingSeatNumbers,
+      pendingTotalPrice: pendingTotalPrice ?? this.pendingTotalPrice,
     );
   }
 
   @override
   List<Object?> get props => [
-    status,
-    seatMap,
-    selectedIds,
-    message,
-    errorMessage,
-    isSubmitting,
-    reservation,
-  ];
+        status,
+        seatMap,
+        selectedIds,
+        message,
+        errorMessage,
+        isSubmitting,
+        reservation,
+        hasPendingBooking,       
+        pendingReservation,    
+        pendingSeatNumbers,   
+        pendingTotalPrice,     
+      ];
 }
 
 class SeatSelectionCubit extends Cubit<SeatSelectionState> {

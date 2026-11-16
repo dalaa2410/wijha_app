@@ -10,23 +10,37 @@ class SeatMapModel extends SeatMap {
     required super.totalRows,
     required super.totalColumns,
     required super.seats,
+    super.origin,
+    super.destination,
+    super.departureTime,
   });
 
   factory SeatMapModel.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>;
-    final trip = data['trip'] as Map<String, dynamic>;
     final bus = data['bus'] as Map<String, dynamic>;
 
+    // الشكل الجديد: حقول الرحلة مباشرة داخل data
+    // الشكل القديم: داخل data.trip. ندعم الاثنين
+    final trip = data['trip'] is Map<String, dynamic>
+        ? data['trip'] as Map<String, dynamic>
+        : data;
+
     return SeatMapModel(
-      tripId: trip['id'] as int,
+      tripId: ((trip['trip_id'] ?? trip['id']) as num).toInt(),
       pricePerSeat: (trip['price_per_seat'] as num).toInt(),
-      currency: trip['currency'] as String,
-      busNumber: bus['bus_number'] as String,
-      totalRows: bus['total_rows'] as int,
-      totalColumns: bus['total_columns'] as int,
+      // الباك لم يعد يرسل العملة: نفترض الليرة السورية حتى يؤكد غير ذلك
+      currency: trip['currency']?.toString() ?? 'SYP',
+      busNumber: bus['bus_number'].toString(),
+      totalRows: (bus['total_rows'] as num).toInt(),
+      totalColumns: (bus['total_columns'] as num).toInt(),
       seats: (data['seats'] as List)
           .map((e) => SeatModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      origin: trip['origin']?.toString(),
+      destination: trip['destination']?.toString(),
+      departureTime: DateTime.tryParse(
+        trip['departure_time']?.toString() ?? '',
+      )?.toLocal(),
     );
   }
 }

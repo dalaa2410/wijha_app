@@ -1,15 +1,12 @@
 import 'package:equatable/equatable.dart';
 
-// enum = قائمة قيم محدودة. أفضل من الـ String لأن المحرر ينبهكِ إن أخطأتِ في الاسم
 enum SeatType { seat, aisle, door, unknown }
 
 enum SeatStatus { available, held, booked }
 
-// Equatable: يجعل مقارنة كائنين تعتمد على قيمهما وليس عنوانهما في الذاكرة،
-// وهذا ما يجعل الـ Cubit يعرف أن الحالة تغيّرت فعلًا فيُعيد رسم الواجهة
 class Seat extends Equatable {
   final int id;
-  final String? number; // الممر والباب بلا رقم، لذلك nullable
+  final String? number; // الممر والباب بلا رقم
   final int row;
   final int column;
   final SeatType type;

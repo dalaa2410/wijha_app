@@ -5,4 +5,5 @@ abstract class SeatRepository {
   Future<SeatMap> getSeatMap(int tripId);
   Future<Reservation> reserveSeats(int tripId, List<int> seatIds);
   Future<void> confirmBooking(int bookingId, String paymentReference);
+  Future<void> cancelBooking(int bookingId);
 }

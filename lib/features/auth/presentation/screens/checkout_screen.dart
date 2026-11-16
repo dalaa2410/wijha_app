@@ -7,6 +7,8 @@ import '../../domain/entities/reservation.dart';
 import '../../domain/repositories/seat_repository.dart';
 import '../cubit/checkout_cubit.dart';
 
+enum _LeaveChoice { cancelBooking, leave, stay }
+
 class CheckoutScreen extends StatelessWidget {
   final Reservation reservation;
   final List<String> seatNumbers;
@@ -33,60 +35,162 @@ class CheckoutScreen extends StatelessWidget {
         bookingId: reservation.bookingId,
         expiresAt: reservation.expiresAt,
       )..start(),
-      child: Scaffold(
-        backgroundColor: AppColors.backgroundLight,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          foregroundColor: AppColors.primaryNavy,
-          centerTitle: true,
-          title: const Text(
-            'مراجعة الحجز',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        body: BlocConsumer<CheckoutCubit, CheckoutState>(
-          listener: (context, state) {
-            if (state.status == CheckoutStatus.failure) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(state.message ?? 'حدث خطأ غير متوقع'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-            }
-          },
-          builder: (context, state) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _CountdownCard(state: state),
-                  const SizedBox(height: 16),
-                  _bookingCard(state),
-                  const SizedBox(height: 24),
-                  ..._bottomSection(context, state),
-                ],
+      child: BlocConsumer<CheckoutCubit, CheckoutState>(
+        listener: _onState,
+        builder: (context, state) {
+          return PopScope(
+            // ما دام الحجز المؤقت قائمًا نسأل المستخدم قبل الخروج
+            canPop: !(state.canCancel || state.isBusy),
+            onPopInvokedWithResult: (didPop, result) {
+              if (!didPop) _askBeforeLeaving(context);
+            },
+            child: Scaffold(
+              backgroundColor: AppColors.backgroundLight,
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                foregroundColor: AppColors.primaryNavy,
+                centerTitle: true,
+                title: const Text(
+                  'مراجعة الحجز',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            );
-          },
-        ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _CountdownCard(state: state),
+                    const SizedBox(height: 16),
+                    _bookingCard(state),
+                    const SizedBox(height: 24),
+                    ..._bottomSection(context, state),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
+  // ───────────── ردود الفعل على تغيّر الحالة ─────────────
+  void _onState(BuildContext context, CheckoutState state) {
+    final messenger = ScaffoldMessenger.of(context);
+    switch (state.status) {
+      case CheckoutStatus.failure:
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(state.message ?? 'حدث خطأ غير متوقع'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+      case CheckoutStatus.cancelled:
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('تم إلغاء الحجز وتحرير المقاعد')),
+          );
+        // نعود لشاشة المقاعد (true = حدّثي الخريطة)
+        Navigator.pop(context, true);
+      default:
+        break;
+    }
+  }
+
+  // ───────────── الإلغاء ─────────────
+  Future<void> _confirmCancel(BuildContext context) async {
+    final cubit = context.read<CheckoutCubit>();
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إلغاء الحجز؟'),
+        content: Text(
+          'سيتم تحرير المقاعد (${seatNumbers.join('، ')}) ولن تتمكن من استعادتها.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('تراجع'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'نعم، ألغِ الحجز',
+              style: TextStyle(color: AppColors.errorRed),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (yes == true) cubit.cancel();
+  }
+
+  // عند الضغط على رجوع والحجز المؤقت قائم
+  Future<void> _askBeforeLeaving(BuildContext context) async {
+    final cubit = context.read<CheckoutCubit>();
+    if (cubit.state.isBusy) return;
+
+    final choice = await showDialog<_LeaveChoice>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('لديك حجز مؤقت'),
+        content: const Text(
+          'المقاعد محجوزة لك حتى انتهاء المهلة. هل تريد إلغاء الحجز الآن؟',
+        ),
+        actionsOverflowDirection: VerticalDirection.down,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, _LeaveChoice.stay),
+            child: const Text('البقاء هنا'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, _LeaveChoice.leave),
+            child: const Text('الخروج مع الاحتفاظ بالحجز'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _LeaveChoice.cancelBooking),
+            child: const Text(
+              'إلغاء الحجز',
+              style: TextStyle(color: AppColors.errorRed),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    switch (choice) {
+      case _LeaveChoice.cancelBooking:
+        cubit.cancel();
+      case _LeaveChoice.leave:
+        Navigator.pop(context, true);
+      case _LeaveChoice.stay:
+      case null:
+        break;
+    }
+  }
+
+  // ───────────── بطاقة تفاصيل الحجز ─────────────
   Widget _bookingCard(CheckoutState state) {
     final isPaid = state.status == CheckoutStatus.success;
-    final isDead = state.status == CheckoutStatus.expired ||
-        state.status == CheckoutStatus.conflict;
+    final isDead =
+        state.status == CheckoutStatus.expired ||
+        state.status == CheckoutStatus.conflict ||
+        state.status == CheckoutStatus.cancelled;
+    final isCancelling = state.status == CheckoutStatus.cancelling;
 
     final (String label, Color color) = isPaid
         ? ('مؤكد', AppColors.successGreen)
         : isDead
-            ? ('غير صالح', AppColors.errorRed)
-            : ('بانتظار الدفع', AppColors.warningOrange);
+        ? ('غير صالح', AppColors.errorRed)
+        : isCancelling
+        ? ('جارٍ الإلغاء', AppColors.errorRed)
+        : ('بانتظار الدفع', AppColors.warningOrange);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -127,7 +231,7 @@ class CheckoutScreen extends StatelessWidget {
             ],
           ),
           const Divider(height: 28),
-          // TODO: المسار والتوقيت (دمشق ← حلب، 08:00) يحتاجان endpoint لتفاصيل الرحلة من الباك
+          // TODO: المسار والتوقيت (من وإلى، ووقت المغادرة) من تفاصيل الرحلة
           _row('الحافلة', busNumber),
           _row('المقاعد', seatNumbers.join('، ')),
           _row(
@@ -176,6 +280,78 @@ class CheckoutScreen extends StatelessWidget {
     );
   }
 
+  // ───────────── الأزرار والبطاقات السفلية ─────────────
+  Widget _payButton(BuildContext context, CheckoutState state) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
+          disabledBackgroundColor: Colors.grey.shade300,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        // يتعطل عند انتهاء المهلة أو التعارض أو أثناء الإرسال والإلغاء
+        onPressed: state.canPay
+            ? () => context.read<CheckoutCubit>().confirm()
+            : null,
+        child: state.status == CheckoutStatus.submitting
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                'تأكيد الحجز والدفع الآن',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: state.canPay ? Colors.white : Colors.grey.shade600,
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _cancelButton(BuildContext context, CheckoutState state) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.errorRed,
+          side: BorderSide(
+            color: state.canCancel
+                ? AppColors.errorRed
+                : Colors.grey.shade300,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: state.canCancel ? () => _confirmCancel(context) : null,
+        child: state.status == CheckoutStatus.cancelling
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.errorRed,
+                ),
+              )
+            : const Text(
+                'إلغاء الحجز',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+      ),
+    );
+  }
+
   List<Widget> _bottomSection(BuildContext context, CheckoutState state) {
     switch (state.status) {
       case CheckoutStatus.success:
@@ -191,17 +367,21 @@ class CheckoutScreen extends StatelessWidget {
         ];
       case CheckoutStatus.expired:
         return [
+          _payButton(context, state), // معطّل
+          const SizedBox(height: 16),
           _NoticeCard(
             color: AppColors.errorRed,
             icon: Icons.timer_off_outlined,
             title: 'انتهت مهلة الحجز',
-            message: 'تم تحرير المقاعد. اختاري مقاعد من جديد.',
+            message: 'تم تحرير المقاعد. اختر مقاعد من جديد.',
             buttonLabel: 'اختيار مقاعد من جديد',
             onPressed: () => Navigator.pop(context, true),
           ),
         ];
       case CheckoutStatus.conflict:
         return [
+          _payButton(context, state), // معطّل
+          const SizedBox(height: 16),
           _NoticeCard(
             color: AppColors.errorRed,
             icon: Icons.error_outline,
@@ -211,44 +391,16 @@ class CheckoutScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context, true),
           ),
         ];
+      case CheckoutStatus.cancelled:
+        return const []; // لحظة عابرة: الشاشة تُغلق من الـ listener
       case CheckoutStatus.active:
       case CheckoutStatus.submitting:
       case CheckoutStatus.failure:
+      case CheckoutStatus.cancelling:
         return [
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                disabledBackgroundColor:
-                    AppColors.primaryBlue.withValues(alpha: 0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: state.canPay
-                  ? () => context.read<CheckoutCubit>().confirm()
-                  : null,
-              child: state.status == CheckoutStatus.submitting
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'تأكيد الحجز والدفع الآن',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-            ),
-          ),
+          _payButton(context, state),
+          const SizedBox(height: 12),
+          _cancelButton(context, state),
         ];
     }
   }
@@ -274,7 +426,9 @@ class _CountdownCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.warningBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.warningOrange.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: AppColors.warningOrange.withValues(alpha: 0.4),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -294,7 +448,10 @@ class _CountdownCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   'حجز مؤقت · تعود المقاعد متاحة عند انتهاء الوقت.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),

@@ -11,6 +11,14 @@ import 'package:wijha_app/features/auth/data/repositories/auth_repository_impl.d
 import 'package:wijha_app/features/auth/data/repositories/seat_repository_impl.dart';
 import 'package:wijha_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:wijha_app/features/auth/domain/repositories/seat_repository.dart';
+import 'package:wijha_app/features/trips/data/datasources/trip_data_source.dart';
+import 'package:wijha_app/features/trips/data/repositories/trip_repository_impl.dart';
+import 'package:wijha_app/features/trips/domain/repositories/trip_repository.dart';
+
+/// مفتاح واحد لوضع العرض الاحتياطي:
+/// true  = الرحلات والمقاعد من ملفات تجريبية (بلا باك). الدخول يبقى حقيقيًا
+/// false = كل شيء من الباك الحقيقي
+const bool kUseMockData = false;
 
 final sl = GetIt.instance; // service locator: مخزن مركزي للكائنات المشتركة
 
@@ -41,10 +49,23 @@ void setupDependencies() {
   });
 
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(AuthRemoteDataSource(sl<ApiClient>()), sl<TokenStorage>()),
+    () => AuthRepositoryImpl(
+      AuthRemoteDataSource(sl<ApiClient>()),
+      sl<TokenStorage>(),
+    ),
   );
-  sl.registerLazySingleton<SeatRepository>(
-    () => SeatRepositoryImpl(SeatRemoteDataSource(sl<ApiClient>())),
-  );
-  
+
+  sl.registerLazySingleton<SeatRepository>(() {
+    final SeatDataSource source = kUseMockData
+        ? SeatMockDataSource()
+        : SeatRemoteDataSource(sl<ApiClient>());
+    return SeatRepositoryImpl(source);
+  });
+
+  sl.registerLazySingleton<TripRepository>(() {
+    final TripDataSource source = kUseMockData
+        ? TripMockDataSource()
+        : TripRemoteDataSource(sl<ApiClient>());
+    return TripRepositoryImpl(source);
+  });
 }
