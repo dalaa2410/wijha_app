@@ -12,4 +12,7 @@ class ApiEndpoints {
 
   // إلغاء الحجز (API 8): {{base_url}}/bookings/{{booking_id}}
   static String cancelBooking(int bookingId) => '/bookings/$bookingId';
+
+  // بدء الدفع (API 10): {{base_url}}/bookings/{{booking_id}}/pay
+  static String payBooking(int bookingId) => '/bookings/$bookingId/pay';
 }

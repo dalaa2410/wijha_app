@@ -3,10 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wijha_app/core/constants/app_colors.dart';
 import 'package:wijha_app/core/di/injection.dart';
 import 'package:wijha_app/core/utils/price_formatter.dart';
+import 'package:wijha_app/features/bookings/domain/entities/booking.dart';
+import 'package:wijha_app/features/bookings/domain/repositories/booking_repository.dart';
+import 'package:wijha_app/features/bookings/presentation/screens/booking_details_screen.dart';
+import 'package:wijha_app/features/bookings/presentation/widgets/hold_banner.dart';
 import '../../domain/repositories/seat_repository.dart';
 import '../cubit/seat_selection_cubit.dart';
 import '../widgets/bus_seat_grid.dart';
-import 'checkout_screen.dart';
 
 class SeatMapScreen extends StatelessWidget {
   final int tripId;
@@ -15,12 +18,25 @@ class SeatMapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) =>
-          SeatSelectionCubit(repository: sl<SeatRepository>(), tripId: tripId)
-            ..loadSeats(),
+      create: (_) => SeatSelectionCubit(
+        repository: sl<SeatRepository>(),
+        bookingRepository: sl<BookingRepository>(),
+        tripId: tripId,
+      )..loadSeats(),
       child: const _SeatMapView(),
     );
   }
+}
+
+// يفتح تفاصيل الحجز، وعند العودة (دفع أو إلغاء أو انتهاء) نحدّث الخريطة
+// فتتحول المقاعد الصفراء إلى خضراء بعد الدفع
+Future<void> _openBooking(BuildContext context, Booking booking) async {
+  final cubit = context.read<SeatSelectionCubit>();
+  await Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => BookingDetailsScreen(booking: booking)),
+  );
+  if (!cubit.isClosed) cubit.refresh();
 }
 
 class _SeatMapView extends StatelessWidget {
@@ -51,32 +67,13 @@ class _SeatMapView extends StatelessWidget {
       body: BlocListener<SeatSelectionCubit, SeatSelectionState>(
         listenWhen: (prev, curr) =>
             (curr.message != null && prev.message != curr.message) ||
-            (curr.reservation != null && prev.reservation != curr.reservation),
+            (curr.createdBooking != null &&
+                prev.createdBooking != curr.createdBooking),
         listener: (context, state) {
-          if (state.reservation != null) {
-            // الحجز المؤقت نجح: ننتقل إلى شاشة المراجعة ومعنا بيانات الحجز
-            final map = state.seatMap!;
-            final seatNumbers =
-                state.selectedSeats.map((s) => s.number ?? '').toList();
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CheckoutScreen(
-                  reservation: state.reservation!,
-                  seatNumbers: seatNumbers,
-                  pricePerSeat: map.pricePerSeat,
-                  totalPrice: state.totalPrice,
-                  currency: map.currency,
-                  busNumber: map.busNumber,
-                ),
-              ),
-            ).then((result) {
-              // العودة من المراجعة (انتهاء أو تعارض أو نجاح): نحدّث الخريطة
-              if (result == true && context.mounted) {
-                context.read<SeatSelectionCubit>().refresh();
-              }
-            });
+          final booking = state.createdBooking;
+          if (booking != null) {
+            // الحجز المؤقت نجح: ننتقل إلى تفاصيل الحجز (دفع/إلغاء)
+            _openBooking(context, booking);
           } else if (state.message != null) {
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
@@ -109,9 +106,18 @@ class _LoadedView extends StatelessWidget {
     final cubit = context.read<SeatSelectionCubit>();
     final map = state.seatMap!;
     final seatNumbers = state.selectedSeats.map((s) => s.number).join('، ');
+    final hold = state.activeHold;
 
     return Column(
       children: [
+        // حجز معلّق لهذه الرحلة ما دامت مهلته لم تنتهِ: زر للعودة إلى تفاصيله
+        if (hold != null && !hold.isHoldExpired)
+          HoldBanner(
+            key: ValueKey('hold-${hold.id}'),
+            booking: hold,
+            onTap: () => _openBooking(context, hold),
+            onExpired: cubit.refreshHold,
+          ),
         const _Legend(),
         Expanded(
           child: SingleChildScrollView(
@@ -142,6 +148,7 @@ class _LoadedView extends StatelessWidget {
                   BusSeatGrid(
                     seatMap: map,
                     selectedIds: state.selectedIds,
+                    mySeats: state.mySeats,
                     onSeatTap: cubit.toggleSeat,
                   ),
                 ],
@@ -238,7 +245,12 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget item(Color color, IconData? icon, String label) => Row(
+    Widget item(
+      Color color,
+      IconData? icon,
+      String label, {
+      Color iconColor = Colors.white,
+    }) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -248,9 +260,7 @@ class _Legend extends StatelessWidget {
             color: color,
             borderRadius: BorderRadius.circular(5),
           ),
-          child: icon == null
-              ? null
-              : Icon(icon, size: 12, color: Colors.white),
+          child: icon == null ? null : Icon(icon, size: 12, color: iconColor),
         ),
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 12)),
@@ -260,11 +270,20 @@ class _Legend extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Wrap(
-        spacing: 16,
+        spacing: 14,
+        runSpacing: 8,
+        alignment: WrapAlignment.center,
         children: [
           item(const Color(0xFFE2E8F0), null, 'متاح'),
           item(AppColors.primaryBlue, Icons.check, 'مختار'),
-          item(const Color(0xFF94A3B8), Icons.lock_outline, 'غير متاح'),
+          item(
+            const Color(0xFFFACC15),
+            Icons.schedule,
+            'محجوز لك (بانتظار الدفع)',
+            iconColor: const Color(0xFF713F12),
+          ),
+          item(AppColors.successGreen, Icons.verified_user_outlined, 'مدفوع'),
+          item(const Color(0xFF94A3B8), Icons.lock_outline, 'محجوز لغيرك'),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/seat.dart';
 import '../../domain/entities/seat_map.dart';
+import '../../domain/entities/seat_ownership.dart';
 import 'seat_tile.dart';
 
 class BusSeatGrid extends StatelessWidget {
@@ -8,17 +9,20 @@ class BusSeatGrid extends StatelessWidget {
   final Set<int> selectedIds;
   final ValueChanged<Seat> onSeatTap;
 
+  /// رقم المقعد ← ملكيته (المقاعد التي حجزها المستخدم في هذه الرحلة)
+  final Map<String, SeatOwnership> mySeats;
+
   const BusSeatGrid({
     super.key,
     required this.seatMap,
     required this.selectedIds,
     required this.onSeatTap,
+    this.mySeats = const {},
   });
 
   @override
   Widget build(BuildContext context) {
-    // نثبّت الاتجاه LTR هنا ليكون العمود 1 دائمًا من اليسار كما يرسله الباك،
-    // وإن أردتِ العكس غيّريه إلى TextDirection.rtl
+    // نثبّت الاتجاه LTR ليكون العمود 1 دائمًا من اليسار كما يرسله الباك
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Column(
@@ -44,11 +48,20 @@ class BusSeatGrid extends StatelessWidget {
 
     switch (seat.type) {
       case SeatType.seat:
-        return SeatTile(
-          seat: seat,
-          isSelected: selectedIds.contains(seat.id),
-          onTap: () => onSeatTap(seat),
-        );
+        {
+          // الملكية تُطبَّق فقط على المقعد غير المتاح عند الباك
+          final number = seat.number;
+          final ownership = (!seat.isSelectable && number != null)
+              ? (mySeats[number] ?? SeatOwnership.none)
+              : SeatOwnership.none;
+
+          return SeatTile(
+            seat: seat,
+            isSelected: selectedIds.contains(seat.id),
+            ownership: ownership,
+            onTap: () => onSeatTap(seat),
+          );
+        }
       case SeatType.door:
         return const SizedBox(
           height: 44,

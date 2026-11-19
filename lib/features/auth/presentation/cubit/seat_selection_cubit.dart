@@ -1,12 +1,44 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wijha_app/core/network/api_exception.dart';
-import '../../domain/entities/reservation.dart';
+import 'package:wijha_app/features/bookings/domain/entities/booking.dart';
+import 'package:wijha_app/features/bookings/domain/repositories/booking_repository.dart';
 import '../../domain/entities/seat.dart';
 import '../../domain/entities/seat_map.dart';
+import '../../domain/entities/seat_ownership.dart';
 import '../../domain/repositories/seat_repository.dart';
 
 enum SeatMapStatus { loading, loaded, failure }
+
+// يحوّل حجوزاتك لهذه الرحلة إلى: رقم المقعد ← ملكيته
+//   حجز معلّق لم تنتهِ مهلته  ← mineHeld (أصفر)
+//   حجز مدفوع                 ← mineConfirmed (أخضر)
+//   ملغى أو منتهٍ              ← لا يُلوَّن
+Map<String, SeatOwnership> buildSeatOwnership(
+  List<Booking> bookings,
+  int tripId,
+) {
+  final result = <String, SeatOwnership>{};
+  final now = DateTime.now();
+
+  for (final b in bookings) {
+    if (b.tripId != tripId) continue;
+
+    final SeatOwnership? kind = switch (b.status) {
+      BookingStatus.confirmed => SeatOwnership.mineConfirmed,
+      BookingStatus.pending when b.expiresAt.isAfter(now) =>
+        SeatOwnership.mineHeld,
+      _ => null,
+    };
+    if (kind == null) continue;
+
+    for (final n in b.seatNumbers) {
+      // المدفوع يغلب المعلّق إن تكرر الرقم
+      if (result[n] != SeatOwnership.mineConfirmed) result[n] = kind;
+    }
+  }
+  return result;
+}
 
 class SeatSelectionState extends Equatable {
   final SeatMapStatus status;
@@ -15,11 +47,9 @@ class SeatSelectionState extends Equatable {
   final String? message; // رسالة عابرة (SnackBar)
   final String? errorMessage; // سبب فشل التحميل
   final bool isSubmitting; // أثناء إرسال طلب الحجز
-  final Reservation? reservation;
-  final bool hasPendingBooking;
-  final Reservation? pendingReservation;
-  final List<String> pendingSeatNumbers;
-  final int pendingTotalPrice;
+  final Booking? createdBooking; // حجز جديد (مرة واحدة) للانتقال لتفاصيله
+  final Booking? activeHold; // حجز معلّق لهذه الرحلة لم تنتهِ مهلته
+  final Map<String, SeatOwnership> mySeats; // مقاعدك في هذه الرحلة وألوانها
 
   const SeatSelectionState({
     this.status = SeatMapStatus.loading,
@@ -28,11 +58,9 @@ class SeatSelectionState extends Equatable {
     this.message,
     this.errorMessage,
     this.isSubmitting = false,
-    this.reservation,
-    this.hasPendingBooking = false,
-    this.pendingReservation,
-    this.pendingSeatNumbers = const [],
-    this.pendingTotalPrice = 0,
+    this.createdBooking,
+    this.activeHold,
+    this.mySeats = const {},
   });
 
   List<Seat> get selectedSeats {
@@ -50,13 +78,12 @@ class SeatSelectionState extends Equatable {
     String? message,
     String? errorMessage,
     bool? isSubmitting,
-    Reservation? reservation,
+    Booking? createdBooking,
+    Booking? activeHold,
+    Map<String, SeatOwnership>? mySeats,
     bool clearMessage = false,
-    bool clearReservation = false,
-    bool? hasPendingBooking,
-    Reservation? pendingReservation,
-    List<String>? pendingSeatNumbers,
-    int? pendingTotalPrice,
+    bool clearCreatedBooking = false,
+    bool clearHold = false,
   }) {
     return SeatSelectionState(
       status: status ?? this.status,
@@ -65,42 +92,66 @@ class SeatSelectionState extends Equatable {
       message: clearMessage ? null : (message ?? this.message),
       errorMessage: errorMessage ?? this.errorMessage,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      reservation: clearReservation ? null : (reservation ?? this.reservation),
-      hasPendingBooking: hasPendingBooking ?? this.hasPendingBooking,
-      pendingReservation: pendingReservation ?? this.pendingReservation,
-      pendingSeatNumbers: pendingSeatNumbers ?? this.pendingSeatNumbers,
-      pendingTotalPrice: pendingTotalPrice ?? this.pendingTotalPrice,
+      createdBooking: clearCreatedBooking
+          ? null
+          : (createdBooking ?? this.createdBooking),
+      activeHold: clearHold ? null : (activeHold ?? this.activeHold),
+      mySeats: mySeats ?? this.mySeats,
     );
   }
 
   @override
   List<Object?> get props => [
-        status,
-        seatMap,
-        selectedIds,
-        message,
-        errorMessage,
-        isSubmitting,
-        reservation,
-        hasPendingBooking,       
-        pendingReservation,    
-        pendingSeatNumbers,   
-        pendingTotalPrice,     
-      ];
+    status,
+    seatMap,
+    selectedIds,
+    message,
+    errorMessage,
+    isSubmitting,
+    createdBooking,
+    activeHold,
+    mySeats,
+  ];
 }
 
 class SeatSelectionCubit extends Cubit<SeatSelectionState> {
   final SeatRepository repository;
+  final BookingRepository bookingRepository;
   final int tripId;
   static const int maxSeats = 5;
 
-  SeatSelectionCubit({required this.repository, required this.tripId})
-    : super(const SeatSelectionState());
+  SeatSelectionCubit({
+    required this.repository,
+    required this.bookingRepository,
+    required this.tripId,
+  }) : super(const SeatSelectionState());
+
+  // حجوزات هذه الرحلة: (الحجز المعلّق القائم، وألوان مقاعدك)
+  Future<({Booking? hold, Map<String, SeatOwnership> seats})>
+  _loadMyBookingsInfo() async {
+    try {
+      final all = await bookingRepository.getMyBookings();
+      Booking? hold;
+      for (final b in all) {
+        // القائمة مرتبة: الأحدث أولًا
+        if (b.tripId == tripId &&
+            b.status == BookingStatus.pending &&
+            b.expiresAt.isAfter(DateTime.now())) {
+          hold = b;
+          break;
+        }
+      }
+      return (hold: hold, seats: buildSeatOwnership(all, tripId));
+    } catch (_) {
+      return (hold: null, seats: const <String, SeatOwnership>{});
+    }
+  }
 
   Future<void> loadSeats({bool keepSelection = true}) async {
     emit(state.copyWith(status: SeatMapStatus.loading));
     try {
       final map = await repository.getSeatMap(tripId);
+      final mine = await _loadMyBookingsInfo();
       if (isClosed) return;
 
       // keepSelection = true: نُبقي اختياراتكِ ونحذف ما حجزه غيركِ (حالة 409)
@@ -118,6 +169,9 @@ class SeatSelectionCubit extends Cubit<SeatSelectionState> {
           status: SeatMapStatus.loaded,
           seatMap: map,
           selectedIds: selected,
+          activeHold: mine.hold,
+          clearHold: mine.hold == null,
+          mySeats: mine.seats,
         ),
       );
     } on ApiException catch (e) {
@@ -139,6 +193,19 @@ class SeatSelectionCubit extends Cubit<SeatSelectionState> {
   // زر التحديث: يمسح الاختيار ويجلب الخريطة من جديد
   Future<void> refresh() => loadSeats(keepSelection: false);
 
+  // يُستدعى عند انتهاء مهلة شريط المتابعة: تعود المقاعد الصفراء إلى حالتها
+  Future<void> refreshHold() async {
+    final mine = await _loadMyBookingsInfo();
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        activeHold: mine.hold,
+        clearHold: mine.hold == null,
+        mySeats: mine.seats,
+      ),
+    );
+  }
+
   void toggleSeat(Seat seat) {
     if (!seat.isSelectable) return;
 
@@ -157,6 +224,8 @@ class SeatSelectionCubit extends Cubit<SeatSelectionState> {
 
   Future<void> reserveSelected() async {
     if (state.selectedIds.isEmpty || state.isSubmitting) return;
+    final map = state.seatMap;
+    if (map == null) return;
 
     emit(state.copyWith(isSubmitting: true));
     try {
@@ -165,9 +234,36 @@ class SeatSelectionCubit extends Cubit<SeatSelectionState> {
         state.selectedIds.toList(),
       );
       if (isClosed) return;
-      emit(state.copyWith(isSubmitting: false, reservation: reservation));
-      emit(state.copyWith(clearReservation: true));
-      // المقاعد صارت محجوزة في الباك: نحدّث الخريطة ونصفّر الاختيار
+
+      // نحفظ الحجز محليًا ليظهر في "حجوزاتي" وفي شريط المتابعة وألوان المقاعد
+      final booking = Booking(
+        id: reservation.bookingId,
+        tripId: tripId,
+        seatNumbers: state.selectedSeats.map((s) => s.number ?? '').toList(),
+        pricePerSeat: map.pricePerSeat,
+        totalPrice: state.totalPrice,
+        currency: map.currency,
+        busNumber: map.busNumber,
+        origin: map.origin,
+        destination: map.destination,
+        departureTime: map.departureTime,
+        // إن لم يرسل الباك وقت الانتهاء نفترض 10 دقائق
+        expiresAt:
+            reservation.expiresAt ??
+            DateTime.now().add(const Duration(minutes: 10)),
+        createdAt: DateTime.now(),
+        status: BookingStatus.pending,
+        paymentUrl: null,
+      );
+      try {
+        await bookingRepository.saveBooking(booking);
+      } catch (_) {
+        // فشل التخزين المحلي لا يمنع المتابعة، فالحجز موجود في الباك
+      }
+
+      emit(state.copyWith(isSubmitting: false, createdBooking: booking));
+      emit(state.copyWith(clearCreatedBooking: true));
+      // المقاعد صارت محجوزة في الباك: نحدّث الخريطة (فتظهر صفراء) ونصفّر الاختيار
       await loadSeats(keepSelection: false);
     } on ConflictException catch (e) {
       // 409: أحدهم حجز مقعدًا قبلكِ. نحدّث الخريطة ونُبقي ما تبقى من اختياراتكِ

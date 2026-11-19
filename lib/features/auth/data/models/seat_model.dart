@@ -8,12 +8,19 @@ class SeatModel extends Seat {
     required super.column,
     required super.type,
     required super.status,
+    super.isMine,
   });
 
   factory SeatModel.fromJson(Map<String, dynamic> json) {
     final row = (json['row'] as num).toInt();
     final column = (json['column'] as num).toInt();
     final isAvailable = json['is_available'] as bool? ?? false;
+    final rawStatus = json['status'] as String?;
+
+    final isMine = (json['is_mine'] as bool?) ??
+        (json['is_reserved_by_me'] as bool?) ??
+        (json['reserved_by_me'] as bool?) ??
+        (rawStatus == 'mine' || rawStatus == 'my_seat');
 
     return SeatModel(
       // الممر والباب يأتيان الآن بـ id = null، فنعطيهما رقمًا سالبًا فريدًا
@@ -22,7 +29,8 @@ class SeatModel extends Seat {
       row: row,
       column: column,
       type: _parseType(json['type'] as String?),
-      status: _parseStatus(json['status'] as String?, isAvailable),
+      status: _parseStatus(rawStatus, isAvailable),
+      isMine: isMine,
     );
   }
 
@@ -38,7 +46,7 @@ class SeatModel extends Seat {
   static SeatStatus _parseStatus(String? raw, bool isAvailable) => switch (raw) {
     'available' => SeatStatus.available,
     'held' => SeatStatus.held,
-    'booked' => SeatStatus.booked,
+    'booked' || 'mine' || 'my_seat' => SeatStatus.booked,
     _ => isAvailable ? SeatStatus.available : SeatStatus.booked,
   };
 }

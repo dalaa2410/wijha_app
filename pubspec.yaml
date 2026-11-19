@@ -23,6 +23,8 @@ dependencies:
   dio: ^5.11.1
   flutter_secure_storage: ^10.3.4
   get_it: ^9.3.0
+  webview_flutter: ^4.13.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +32,7 @@ dev_dependencies:
 
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 
 flutter:
@@ -42,3 +45,10 @@ flutter:
     - assets/images/
     - assets/mock/
     
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF" # لون خلفية الأيقونة الدائرية على أندرويد (يمكنك تغييره للون اللوغو مثل #1A237E)
+  adaptive_icon_foreground: "assets/images/logo.png"

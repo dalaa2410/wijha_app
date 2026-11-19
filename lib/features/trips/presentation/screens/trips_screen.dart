@@ -4,6 +4,7 @@ import 'package:wijha_app/core/constants/app_colors.dart';
 import 'package:wijha_app/core/di/injection.dart';
 import 'package:wijha_app/core/utils/date_formatter.dart';
 import 'package:wijha_app/features/auth/presentation/screens/seat_map_screen.dart';
+import 'package:wijha_app/features/bookings/presentation/screens/my_bookings_screen.dart';
 import '../../domain/entities/trip.dart';
 import '../../domain/repositories/trip_repository.dart';
 import '../cubit/trips_cubit.dart';
@@ -509,8 +510,12 @@ class _BottomNav extends StatelessWidget {
       selectedFontSize: 12,
       unselectedFontSize: 12,
       onTap: (i) {
-        if (i != 0) {
-          // شاشتا "حجوزاتي" و"الحساب" لم تُبنَيا بعد
+        if (i == 1) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+          );
+        } else if (i == 2) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(const SnackBar(content: Text('قريبًا')));

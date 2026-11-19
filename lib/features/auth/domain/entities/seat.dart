@@ -11,6 +11,7 @@ class Seat extends Equatable {
   final int column;
   final SeatType type;
   final SeatStatus status;
+  final bool isMine; // هل هذا المقعد محجوز/مدفوع بواسطتي؟
 
   const Seat({
     required this.id,
@@ -19,11 +20,13 @@ class Seat extends Equatable {
     required this.column,
     required this.type,
     required this.status,
+    this.isMine = false,
   });
 
   bool get isSeat => type == SeatType.seat;
   bool get isSelectable => isSeat && status == SeatStatus.available;
+  bool get isMySeat => isSeat && isMine && status != SeatStatus.available;
 
   @override
-  List<Object?> get props => [id, number, row, column, type, status];
+  List<Object?> get props => [id, number, row, column, type, status, isMine];
 }

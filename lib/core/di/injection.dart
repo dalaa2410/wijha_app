@@ -11,12 +11,16 @@ import 'package:wijha_app/features/auth/data/repositories/auth_repository_impl.d
 import 'package:wijha_app/features/auth/data/repositories/seat_repository_impl.dart';
 import 'package:wijha_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:wijha_app/features/auth/domain/repositories/seat_repository.dart';
+import 'package:wijha_app/features/bookings/data/datasources/booking_local_data_source.dart';
+import 'package:wijha_app/features/bookings/data/datasources/booking_remote_data_source.dart';
+import 'package:wijha_app/features/bookings/data/repositories/booking_repository_impl.dart';
+import 'package:wijha_app/features/bookings/domain/repositories/booking_repository.dart';
 import 'package:wijha_app/features/trips/data/datasources/trip_data_source.dart';
 import 'package:wijha_app/features/trips/data/repositories/trip_repository_impl.dart';
 import 'package:wijha_app/features/trips/domain/repositories/trip_repository.dart';
 
 /// مفتاح واحد لوضع العرض الاحتياطي:
-/// true  = الرحلات والمقاعد من ملفات تجريبية (بلا باك). الدخول يبقى حقيقيًا
+/// true  = الرحلات والمقاعد والدفع من بيانات تجريبية (بلا باك). الدخول يبقى حقيقيًا
 /// false = كل شيء من الباك الحقيقي
 const bool kUseMockData = false;
 
@@ -48,6 +52,7 @@ void setupDependencies() {
     return ApiClient(dio);
   });
 
+  // ----- المصادقة -----
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(
       AuthRemoteDataSource(sl<ApiClient>()),
@@ -55,6 +60,7 @@ void setupDependencies() {
     ),
   );
 
+  // ----- المقاعد -----
   sl.registerLazySingleton<SeatRepository>(() {
     final SeatDataSource source = kUseMockData
         ? SeatMockDataSource()
@@ -62,10 +68,20 @@ void setupDependencies() {
     return SeatRepositoryImpl(source);
   });
 
+  // ----- الرحلات -----
   sl.registerLazySingleton<TripRepository>(() {
     final TripDataSource source = kUseMockData
         ? TripMockDataSource()
         : TripRemoteDataSource(sl<ApiClient>());
     return TripRepositoryImpl(source);
+  });
+
+  // ----- الحجوزات (الدفع والإلغاء من الباك + سجل محلي لحجوزاتي) -----
+  sl.registerLazySingleton(() => BookingLocalDataSource());
+  sl.registerLazySingleton<BookingRepository>(() {
+    final BookingRemoteDataSource remote = kUseMockData
+        ? BookingMockDataSource()
+        : BookingApiDataSource(sl<ApiClient>());
+    return BookingRepositoryImpl(remote, sl<BookingLocalDataSource>());
   });
 }

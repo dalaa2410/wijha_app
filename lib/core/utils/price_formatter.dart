@@ -1,7 +1,9 @@
-String formatPrice(int amount, String currency) {
-  final grouped = amount.toString().replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (m) => ',',
+String formatPrice(num amount, [String currency = 'SYP']) {
+  final intVal = amount.round();
+  final formatted = intVal.toString().replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]},',
   );
-  return '$grouped $currency';
+  final unit = currency.toUpperCase() == 'SYP' ? 'ل.س' : currency;
+  return '$formatted $unit';
 }
